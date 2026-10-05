@@ -16,14 +16,19 @@ import tools.jackson.databind.json.JsonMapper;
 public class MetalPriceService {
  public record MetalPrice(String symbol, String name, String category, BigDecimal price, String currency, String unit, BigDecimal changePercent) {}
  public record PriceResponse(String source, boolean demo, Instant updatedAt, List<MetalPrice> metals) {}
+ private final List<String> groups;
  private final String key;
  private final String endpoint;
  private final HttpClient client;
  private String cached;
  private Instant expires = Instant.EPOCH;
+ @org.springframework.beans.factory.annotation.Autowired
  public MetalPriceService(@Value("${brsapi.key:}") String key,
    @Value("${brsapi.url:https://api.brsapi.ir/Market/Gold_Currency.php}") String endpoint) {
-  this.key=key; this.endpoint=endpoint;
+  this(key,endpoint,List.of("gold","currency","cryptocurrency"));
+ }
+ MetalPriceService(String key, String endpoint, List<String> groups) {
+  this.groups=groups; this.key=key; this.endpoint=endpoint;
   var builder=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5));
   String proxy=System.getenv("HTTPS_PROXY");
   if (proxy==null) proxy=System.getenv("https_proxy");
@@ -44,7 +49,7 @@ public class MetalPriceService {
    var response=client.send(request,HttpResponse.BodyHandlers.ofString());
    if (response.statusCode()!=200) throw new IllegalArgumentException("Upstream rejected request");
    var payload=JsonMapper.builder().build().readTree(response.body());
-   for (String group:List.of("gold","currency","cryptocurrency")) {
+   for (String group:groups) {
     var rows=payload.get(group);
     if (rows==null || !rows.isArray()) throw new IllegalArgumentException("Missing market group");
     for (var q:rows) {

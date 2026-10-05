@@ -30,11 +30,18 @@ class MetalPriceApiTest {
     exchange.getResponseHeaders().set("Content-Type","application/json");
     exchange.sendResponseHeaders(200,bytes.length);
     exchange.getResponseBody().write(bytes);exchange.close();
+   });
+   upstream.createContext("/commodity",exchange->{
+    if (!"key=test-key".equals(exchange.getRequestURI().getRawQuery())) { exchange.sendResponseHeaders(401,-1);exchange.close();return; }
+    byte[] bytes=MetalPriceApiTest.class.getResourceAsStream("/brsapi-commodity.json").readAllBytes();
+    exchange.getResponseHeaders().set("Content-Type","application/json");
+    exchange.sendResponseHeaders(200,bytes.length);exchange.getResponseBody().write(bytes);exchange.close();
    });upstream.start();
   } catch(Exception e) {throw new ExceptionInInitializerError(e);}
  }
  @DynamicPropertySource static void properties(DynamicPropertyRegistry r) {
   r.add("brsapi.key",()->"test-key");
+  r.add("brsapi.commodity-url",()->"http://127.0.0.1:"+upstream.getAddress().getPort()+"/commodity");
   r.add("brsapi.url",()->"http://127.0.0.1:"+upstream.getAddress().getPort()+"/prices");
  }
  @org.junit.jupiter.api.AfterAll static void stop(){upstream.stop(0);}
@@ -60,6 +67,21 @@ class MetalPriceApiTest {
   var parsed=MetalPriceService.parse(fixture);
   assertThat(parsed.updatedAt()).isEqualTo(Instant.ofEpochSecond(1791204856));
   assertThat(parsed.metals()).hasSize(1);
+ }
+ @Test void servesAllCommodityGroupsWithPrecisionAndNegativeChanges() throws Exception {
+  var request=HttpRequest.newBuilder(URI.create("http://localhost:"+port+"/api/v1/markets/commodity")).GET().build();
+  var client=HttpClient.newHttpClient();
+  var response=client.send(request,HttpResponse.BodyHandlers.ofString());
+  assertThat(response.statusCode()).isEqualTo(200);
+  var json=tools.jackson.databind.json.JsonMapper.builder().build().readTree(response.body());
+  assertThat(json.get("metal_precious").size()).isEqualTo(4);
+  assertThat(json.get("metal_base").size()).isEqualTo(5);
+  assertThat(json.get("energy").size()).isEqualTo(5);
+  assertThat(json.get("energy").get(0).get("price").asDouble()).isEqualTo(101.627);
+  assertThat(json.get("energy").get(0).get("change_value").asDouble()).isEqualTo(-0.623);
+  assertThat(json.get("metal_base").get(0).get("time_unix").asLong()).isEqualTo(1791207356L);
+  assertThat(client.send(request,HttpResponse.BodyHandlers.ofString()).body()).isEqualTo(response.body());
+  assertThat(response.body()).doesNotContain("test-key");
  }
  @Test void rejectsMissingOrInvalidGoldRatherThanInventingPrices() {
   assertThatThrownBy(()->MetalPriceService.parse("{\"gold\":[]}")).isInstanceOf(IllegalArgumentException.class);
