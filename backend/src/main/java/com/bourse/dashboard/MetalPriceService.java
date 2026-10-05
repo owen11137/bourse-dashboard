@@ -1,26 +1,74 @@
 package com.bourse.dashboard;
+
 import java.math.BigDecimal;
-import java.time.Instant;
+import java.net.*;
+import java.net.http.*;
+import java.nio.charset.StandardCharsets;
+import java.time.*;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.json.JsonMapper;
+
 @Service
 public class MetalPriceService {
  public record MetalPrice(String symbol, String name, String category, BigDecimal price, String currency, String unit, BigDecimal changePercent) {}
  public record PriceResponse(String source, boolean demo, Instant updatedAt, List<MetalPrice> metals) {}
- // Fixed fixture timestamp: refreshing never pretends these are fresh market quotes.
- public PriceResponse prices() {
-  return new PriceResponse("Demo fixtures", true, Instant.parse("2026-10-05T08:00:00Z"), List.of(
-   metal("XAU","طلا","precious","2650.40","troy_ounce","0.82"),
-   metal("XAG","نقره","precious","31.25","troy_ounce","1.34"),
-   metal("XPT","پلاتین","precious","980.60","troy_ounce","-0.45"),
-   metal("XPD","پالادیوم","precious","1050.20","troy_ounce","0.27"),
-   metal("CU","مس","industrial","9450.00","metric_ton","1.12"),
-   metal("AL","آلومینیوم","industrial","2580.50","metric_ton","-0.32"),
-   metal("ZN","روی","industrial","3025.00","metric_ton","0.65"),
-   metal("NI","نیکل","industrial","16840.00","metric_ton","-1.08")
-  ));
+ private final String key;
+ private final String endpoint;
+ private final HttpClient client;
+ private PriceResponse cached;
+ private Instant expires = Instant.EPOCH;
+ public MetalPriceService(@Value("${brsapi.key:}") String key,
+   @Value("${brsapi.url:https://api.brsapi.ir/Market/Gold_Currency.php}") String endpoint) {
+  this.key=key; this.endpoint=endpoint;
+  var builder=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5));
+  String proxy=System.getenv("HTTPS_PROXY");
+  if (proxy==null) proxy=System.getenv("https_proxy");
+  if (proxy!=null && endpoint.startsWith("https://")) {
+   URI p=URI.create(proxy);
+   builder.proxy(ProxySelector.of(new InetSocketAddress(p.getHost(),p.getPort()==-1?80:p.getPort())));
+  }
+  client=builder.build();
  }
- private MetalPrice metal(String symbol,String name,String category,String price,String unit,String change) {
-  return new MetalPrice(symbol,name,category,new BigDecimal(price),"USD",unit,new BigDecimal(change));
+ public synchronized PriceResponse prices() {
+  if (key.isBlank()) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,"کلید BrsAPI در سرور تنظیم نشده است.");
+  if (cached!=null && Instant.now().isBefore(expires)) return cached;
+  try {
+   URI uri=URI.create(endpoint+"?key="+URLEncoder.encode(key,StandardCharsets.UTF_8));
+   var request=HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(10)).GET().build();
+   var response=client.send(request,HttpResponse.BodyHandlers.ofString());
+   if (response.statusCode()!=200) throw new IllegalArgumentException("Upstream rejected request");
+   PriceResponse parsed=parse(response.body());
+   cached=parsed; expires=Instant.now().plusSeconds(60);
+   return parsed;
+  } catch (InterruptedException e) {
+   Thread.currentThread().interrupt();
+   throw unavailable();
+  } catch (Exception e) {
+   // Never expose the upstream URI, response body, or API key in errors.
+   throw unavailable();
+  }
+ }
+ private ResponseStatusException unavailable() {
+  return new ResponseStatusException(HttpStatus.BAD_GATEWAY,"دریافت قیمت معتبر از BrsAPI انجام نشد.");
+ }
+ static PriceResponse parse(String body) {
+  var root=JsonMapper.builder().build().readTree(body);
+  var gold=root.get("gold");
+  if (gold==null || !gold.isArray()) throw new IllegalArgumentException("Missing gold quotes");
+  for (var q:gold) {
+   if (!"XAUUSD".equals(q.path("symbol").asString())) continue;
+   if (!"دلار".equals(q.path("unit").asString())) throw new IllegalArgumentException("Unexpected currency");
+   var price=new BigDecimal(q.path("price").asString());
+   var change=new BigDecimal(q.path("change_percent").asString());
+   long timestamp=Long.parseLong(q.path("time_unix").asString());
+   if (price.signum()<=0 || timestamp<=0) throw new IllegalArgumentException("Invalid quote");
+   return new PriceResponse("BrsAPI",false,Instant.ofEpochSecond(timestamp),List.of(
+    new MetalPrice("XAU","طلا","precious",price,"USD","troy_ounce",change)));
+  }
+  throw new IllegalArgumentException("Missing XAUUSD quote");
  }
 }
