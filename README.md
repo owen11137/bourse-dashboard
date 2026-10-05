@@ -18,7 +18,7 @@ npm ci
 npm run dev
 ```
 صفحه: http://localhost:5173 — مسیر `/` همان صفحه index است.
-Vite درخواست‌های `/api` را به بک‌اند روی پورت 8080 هدایت می‌کند.
+Vite درخواست‌های `/api` را به بک‌اند روی پورت 8086 هدایت می‌کند.
 
 ## بازارهای ایران
 
@@ -31,7 +31,7 @@ Vite درخواست‌های `/api` را به بک‌اند روی پورت 8080
 
 ## API
 
-`GET http://localhost:8080/api/v1/metals/prices`
+`GET http://localhost:8086/api/v1/metals/prices`
 
 خروجی: `source`, `demo`, `updatedAt`, `metals`؛ هر فلز دارای `symbol`, `name`, `category`, `price`, `currency`, `unit`, `changePercent` است.
 قیمت فلزات گران‌بها به دلار بر اونس تروا و صنعتی به دلار بر تن متریک است.

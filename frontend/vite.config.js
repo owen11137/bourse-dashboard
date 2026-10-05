@@ -1,2 +1,2 @@
 import { defineConfig } from 'vite';
-export default defineConfig({server:{proxy:{'/api':{target:'http://localhost:8080',changeOrigin:true}}}});
+export default defineConfig({server:{proxy:{'/api':{target:'http://localhost:8086',changeOrigin:true}}}});
