@@ -46,6 +46,16 @@ class MetalPriceApiTest {
   assertThat(response.statusCode()).isEqualTo(200);
   assertThat(response.body()).contains("\"demo\":false","BrsAPI","\"price\":4156","\"changePercent\":0.39","troy_ounce","USD").doesNotContain("IR_COIN","test-key","XAG");
   assertThat(client.send(request,HttpResponse.BodyHandlers.ofString()).body()).isEqualTo(response.body());
+  var marketRequest=HttpRequest.newBuilder(URI.create("http://localhost:"+port+"/api/v1/markets/gold-currency")).GET().build();
+  var markets=client.send(marketRequest,HttpResponse.BodyHandlers.ofString());
+  assertThat(markets.statusCode()).isEqualTo(200);
+  var all=tools.jackson.databind.json.JsonMapper.builder().build().readTree(markets.body());
+  assertThat(all.get("gold").size()).isEqualTo(9);
+  assertThat(all.get("currency").size()).isEqualTo(28);
+  assertThat(all.get("cryptocurrency").size()).isEqualTo(19);
+  assertThat(markets.body()).doesNotContain("test-key");
+  assertThat(all.get("cryptocurrency").get(13).get("price").asString()).isEqualTo("0.00000595");
+  assertThat(all.get("gold").get(0).get("unit").asString()).isEqualTo("تومان");
   assertThat(calls.get()-before).isEqualTo(1);
   var parsed=MetalPriceService.parse(fixture);
   assertThat(parsed.updatedAt()).isEqualTo(Instant.ofEpochSecond(1791204856));

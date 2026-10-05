@@ -7,4 +7,6 @@ public class MetalPriceController {
  public MetalPriceController(MetalPriceService service) { this.service=service; }
  @GetMapping("/api/v1/metals/prices")
  public MetalPriceService.PriceResponse prices() { return service.prices(); }
+ @GetMapping("/api/v1/markets/gold-currency")
+ public tools.jackson.databind.JsonNode markets() { return service.markets(); }
 }

@@ -19,7 +19,7 @@ public class MetalPriceService {
  private final String key;
  private final String endpoint;
  private final HttpClient client;
- private PriceResponse cached;
+ private String cached;
  private Instant expires = Instant.EPOCH;
  public MetalPriceService(@Value("${brsapi.key:}") String key,
    @Value("${brsapi.url:https://api.brsapi.ir/Market/Gold_Currency.php}") String endpoint) {
@@ -33,7 +33,9 @@ public class MetalPriceService {
   }
   client=builder.build();
  }
- public synchronized PriceResponse prices() {
+ public PriceResponse prices() { return parse(fetch()); }
+ public tools.jackson.databind.JsonNode markets() { return JsonMapper.builder().build().readTree(fetch()); }
+ private synchronized String fetch() {
   if (key.isBlank()) throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,"کلید BrsAPI در سرور تنظیم نشده است.");
   if (cached!=null && Instant.now().isBefore(expires)) return cached;
   try {
@@ -41,9 +43,20 @@ public class MetalPriceService {
    var request=HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(10)).GET().build();
    var response=client.send(request,HttpResponse.BodyHandlers.ofString());
    if (response.statusCode()!=200) throw new IllegalArgumentException("Upstream rejected request");
-   PriceResponse parsed=parse(response.body());
-   cached=parsed; expires=Instant.now().plusSeconds(60);
-   return parsed;
+   var payload=JsonMapper.builder().build().readTree(response.body());
+   for (String group:List.of("gold","currency","cryptocurrency")) {
+    var rows=payload.get(group);
+    if (rows==null || !rows.isArray()) throw new IllegalArgumentException("Missing market group");
+    for (var q:rows) {
+     if (q.path("symbol").asString().isBlank() || q.path("name").asString().isBlank() || q.path("unit").asString().isBlank()) throw new IllegalArgumentException("Invalid quote identity");
+     if (new BigDecimal(q.path("price").asString()).signum()<=0 || Long.parseLong(q.path("time_unix").asString())<=0) throw new IllegalArgumentException("Invalid quote value");
+     new BigDecimal(q.path("change_percent").asString());
+     if (q.has("change_value")) new BigDecimal(q.path("change_value").asString());
+     if (q.has("market_cap")) new BigDecimal(q.path("market_cap").asString());
+    }
+   }
+   cached=response.body(); expires=Instant.now().plusSeconds(60);
+   return cached;
   } catch (InterruptedException e) {
    Thread.currentThread().interrupt();
    throw unavailable();

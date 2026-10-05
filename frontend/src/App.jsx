@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Box, Button, Chip, Container, Divider, InputAdornment, LinearProgress, Paper, Skeleton, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import IranMarketPanel from './IranMarketPanel';
+import GoldCurrencyPanel from './GoldCurrencyPanel';
 import Refresh from '@mui/icons-material/Refresh';
 import Search from '@mui/icons-material/Search';
 import TrendingUp from '@mui/icons-material/TrendingUp';
@@ -56,10 +57,11 @@ export default function App() {
     <ToggleButtonGroup exclusive value={market} onChange={(_, value) => value && setMarket(value)} aria-label="بازار" sx={{ flexWrap: 'wrap', gap: 1, '& .MuiToggleButton-root': { color: '#cbd5e1', border: '1px solid #475569', borderRadius: '8px !important', px: 2 }, '& .MuiToggleButton-root.Mui-selected': { bgcolor: '#3857dd', color: '#fff', '&:hover': { bgcolor: '#2945b8' } } }}>
      <ToggleButton value="indices">شاخص‌های بورس ایران</ToggleButton>
      <ToggleButton value="commodities">بورس کالا</ToggleButton>
+     <ToggleButton value="gold-currency">طلا و ارز</ToggleButton>
      <ToggleButton value="global">فلزات جهانی</ToggleButton>
     </ToggleButtonGroup>
    </Stack></Container>
   </Box>
-  {market === 'global' ? <GlobalMetals /> : <Container maxWidth="xl" sx={{ py: { xs: 3, md: 5 } }}><Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>داشبورد / بازار ایران / {market === 'indices' ? 'شاخص‌ها' : 'بورس کالا'}</Typography><IranMarketPanel key={market} market={market} /></Container>}
+  {market === 'gold-currency' ? <Container maxWidth="xl" sx={{ py: { xs: 3, md: 5 } }}><GoldCurrencyPanel /></Container> : market === 'global' ? <GlobalMetals /> : <Container maxWidth="xl" sx={{ py: { xs: 3, md: 5 } }}><Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>داشبورد / بازار ایران / {market === 'indices' ? 'شاخص‌ها' : 'بورس کالا'}</Typography><IranMarketPanel key={market} market={market} /></Container>}
  </Box>;
 }
