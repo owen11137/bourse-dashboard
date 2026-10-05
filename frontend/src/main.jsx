@@ -1,0 +1,11 @@
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { CacheProvider } from '@emotion/react';
+import createCache from '@emotion/cache';
+import { prefixer } from 'stylis';
+import rtlPlugin from '@mui/stylis-plugin-rtl';
+import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
+import App from './App';
+const cache=createCache({key:'muirtl',stylisPlugins:[prefixer,rtlPlugin]});
+const theme=createTheme({direction:'rtl',palette:{primary:{main:'#3857dd'},background:{default:'#f4f6fa',paper:'#fff'},text:{primary:'#172238',secondary:'#6b778d'}},typography:{fontFamily:'Tahoma, Arial, sans-serif',h4:{fontWeight:800},h6:{fontWeight:700},button:{textTransform:'none',fontWeight:700}},shape:{borderRadius:14},components:{MuiButton:{defaultProps:{disableElevation:true}},MuiPaper:{styleOverrides:{root:{backgroundImage:'none'}}}}});
+createRoot(document.getElementById('root')).render(<React.StrictMode><CacheProvider value={cache}><ThemeProvider theme={theme}><CssBaseline/><App/></ThemeProvider></CacheProvider></React.StrictMode>);

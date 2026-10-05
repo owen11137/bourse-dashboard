@@ -1,0 +1,49 @@
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Box, Button, Chip, Container, Divider, InputAdornment, LinearProgress, Paper, Skeleton, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
+import Public from '@mui/icons-material/Public';
+import Refresh from '@mui/icons-material/Refresh';
+import Search from '@mui/icons-material/Search';
+import TrendingUp from '@mui/icons-material/TrendingUp';
+import TrendingDown from '@mui/icons-material/TrendingDown';
+import Diamond from '@mui/icons-material/Diamond';
+import Dashboard from '@mui/icons-material/Dashboard';
+import ArrowBack from '@mui/icons-material/ArrowBack';
+const colors={XAU:'#cf9e38',XAG:'#8b9db4',XPT:'#758bab',XPD:'#ab8bb9',CU:'#c78252',AL:'#87a6bf',ZN:'#639b93',NI:'#84945d'};
+const units={troy_ounce:'اونس تروا',metric_ton:'تن متریک'};
+const money=new Intl.NumberFormat('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+function Change({value}) { return <Chip size="small" icon={value>=0?<TrendingUp/>:<TrendingDown/>} label={<span dir="ltr">{value>0?'+':''}{value.toFixed(2)}%</span>} sx={{color:value>=0?'#16836a':'#c14a5e',backgroundColor:value>=0?'#e9f7f1':'#fceef1',fontWeight:700}}/>; }
+export default function App() {
+ const [data,setData]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState(''),[query,setQuery]=useState(''),[category,setCategory]=useState('all');
+ const active=useRef(null);
+ async function load() {
+  active.current?.abort(); const controller=new AbortController(); active.current=controller;
+  setLoading(true);setError('');
+  const timeout=setTimeout(()=>controller.abort(),15000);
+  try { const response=await fetch('/api/v1/metals/prices',{signal:controller.signal}); if(!response.ok)throw new Error(); const payload=await response.json();
+   if(!Array.isArray(payload.metals)||payload.metals.some(m=>typeof m.price!=='number'||typeof m.changePercent!=='number')||!Number.isFinite(Date.parse(payload.updatedAt)))throw new Error();
+   if(active.current===controller)setData(payload);
+  } catch(e) { if(active.current===controller)setError('دریافت قیمت‌ها انجام نشد. اتصال به سرور را بررسی و دوباره تلاش کنید.'); }
+  finally {clearTimeout(timeout);if(active.current===controller)setLoading(false);}
+ }
+ useEffect(()=>{load();return()=>{active.current?.abort();active.current=null;};},[]);
+ const rows=(data?.metals??[]).filter(m=>(category==='all'||m.category===category)&&(m.name.includes(query.trim())||m.symbol.toLowerCase().includes(query.trim().toLowerCase())));
+ return <Box>
+  <Box component="header" sx={{background:'#111b2e',color:'white',py:2.5}}><Container maxWidth="xl"><Stack direction="row" justifyContent="space-between" alignItems="center"><Stack direction="row" spacing={1.5} alignItems="center"><Box sx={{p:1,bgcolor:'#3857dd',borderRadius:2,display:'flex'}}><Dashboard/></Box><Box><Typography variant="h6">بورس‌نما</Typography><Typography variant="caption" sx={{color:'#a5b2cb'}}>داشبورد بازارهای مالی</Typography></Box></Stack><Chip icon={<Public/>} label="بازار جهانی" sx={{color:'white',bgcolor:'#253149','& .MuiChip-icon':{color:'#a5b2cb'}}}/></Stack></Container></Box>
+  <Container maxWidth="xl" sx={{py:{xs:3,md:5}}}>
+   <Typography variant="body2" color="text.secondary" sx={{mb:3}}>داشبورد / بازار جهانی / فلزات</Typography>
+   <Stack direction={{xs:'column',sm:'row'}} justifyContent="space-between" spacing={2} sx={{mb:3}}><Box><Typography variant="h4" sx={{fontSize:{xs:26,md:34},mb:1}}>قیمت جهانی فلزات</Typography><Typography color="text.secondary">نمایی یکپارچه از فلزات گران‌بها و صنعتی، به دلار آمریکا</Typography></Box><Button variant="contained" startIcon={<Refresh/>} onClick={load} disabled={loading} sx={{alignSelf:'flex-start',px:3,py:1.3}}>به‌روزرسانی</Button></Stack>
+   <Alert severity="info" sx={{mb:3}}>این پنل از API آزمایشی استفاده می‌کند. قیمت‌ها و تغییرات نمونه هستند و قیمت واقعی بازار نیستند.</Alert>
+   {error&&<Alert severity="error" sx={{mb:3}} action={<Button color="inherit" onClick={load} disabled={loading}>تلاش مجدد</Button>}>{error}</Alert>}
+   <Box sx={{display:'grid',gridTemplateColumns:{xs:'1fr',sm:'repeat(2,1fr)',lg:'repeat(4,1fr)'},gap:2.5,mb:4}}>
+   {(data?.metals.slice(0,4)??[null,null,null,null]).map((m,i)=><Paper key={m?.symbol??i} variant="outlined" sx={{p:3,borderColor:'#e3e8f1',position:'relative',overflow:'hidden'}}><Stack direction="row" justifyContent="space-between" alignItems="center" sx={{mb:3}}><Stack direction="row" spacing={1.5} alignItems="center"><Box sx={{display:'flex',p:1.2,bgcolor:'#f6f7fa',borderRadius:2,color:colors[m?.symbol]??'#8b9db4'}}><Diamond/></Box><Box><Typography fontWeight={700}>{m?.name??<Skeleton width={60}/>}</Typography><Typography variant="caption" color="text.secondary">{m?.symbol??'—'}</Typography></Box></Stack><Typography variant="caption" color="text.secondary">USD</Typography></Stack><Typography variant="h4" dir="ltr" sx={{textAlign:'right',fontSize:30,mb:1}}>{m?money.format(m.price):<Skeleton/>}</Typography><Stack direction="row" justifyContent="space-between" alignItems="center"><Typography variant="caption" color="text.secondary">دلار / {units[m?.unit]??'اونس تروا'}</Typography>{m&&<Change value={m.changePercent}/>}</Stack></Paper>)}
+   </Box>
+   <Paper variant="outlined" sx={{borderColor:'#e3e8f1',overflow:'hidden'}}>
+    <Box sx={{p:3}}><Stack direction={{xs:'column',md:'row'}} justifyContent="space-between" spacing={2} alignItems={{md:'center'}}><Box><Typography variant="h6">دیده‌بان فلزات</Typography><Typography variant="body2" color="text.secondary" sx={{mt:0.5}}>مقایسه قیمت و تغییر روزانه در یک نگاه</Typography></Box><TextField size="small" placeholder="جست‌وجوی نام یا نماد فلز" value={query} onChange={e=>setQuery(e.target.value)} slotProps={{input:{startAdornment:<InputAdornment position="start"><Search/></InputAdornment>},htmlInput:{'aria-label':'جست‌وجوی فلز'}}}/></Stack><ToggleButtonGroup exclusive size="small" value={category} onChange={(_,value)=>value&&setCategory(value)} sx={{mt:2.5}}><ToggleButton value="all">همه فلزات</ToggleButton><ToggleButton value="precious">گران‌بها</ToggleButton><ToggleButton value="industrial">صنعتی</ToggleButton></ToggleButtonGroup></Box>
+    {loading&&<LinearProgress aria-label="دریافت قیمت‌ها"/>}<Divider/>
+    <TableContainer><Table sx={{minWidth:620}} aria-label="قیمت جهانی فلزات"><TableHead sx={{bgcolor:'#f8f9fc'}}><TableRow>{['فلز / نماد','قیمت (دلار)','واحد','تغییر روزانه','نوع فلز'].map(t=><TableCell key={t} sx={{color:'#6b778d',fontWeight:700}}>{t}</TableCell>)}</TableRow></TableHead><TableBody>{rows.map(m=><TableRow key={m.symbol} hover><TableCell><Stack direction="row" spacing={1.5} alignItems="center"><Box sx={{width:9,height:9,borderRadius:'50%',bgcolor:colors[m.symbol]}}/><Box><Typography fontWeight={700} variant="body2">{m.name}</Typography><Typography variant="caption" color="text.secondary">{m.symbol}</Typography></Box></Stack></TableCell><TableCell><Typography dir="ltr" sx={{textAlign:'right',fontWeight:700,fontVariantNumeric:'tabular-nums'}}>{money.format(m.price)}</Typography></TableCell><TableCell>{units[m.unit]??m.unit}</TableCell><TableCell><Change value={m.changePercent}/></TableCell><TableCell><Chip size="small" variant="outlined" label={m.category==='precious'?'گران‌بها':'صنعتی'}/></TableCell></TableRow>)}{!loading&&rows.length===0&&<TableRow><TableCell colSpan={5} align="center" sx={{py:5}}>{data?'فلزی با این مشخصات پیدا نشد.':'هنوز اطلاعاتی دریافت نشده است.'}</TableCell></TableRow>}</TableBody></Table></TableContainer>
+    <Box sx={{p:2.5,bgcolor:'#fafbfd'}}><Stack direction={{xs:'column',sm:'row'}} justifyContent="space-between" spacing={1}><Typography variant="caption" color="text.secondary">زمان دادهٔ نمونه: {data?new Date(data.updatedAt).toLocaleString('fa-IR',{timeZone:'Asia/Tehran'}):'—'} (تهران)</Typography><Typography variant="caption" color="text.secondary">{rows.length} فلز · منبع: API آزمایشی</Typography></Stack></Box>
+   </Paper>
+   <Stack direction="row" alignItems="center" spacing={1} sx={{mt:3,color:'text.secondary'}}><ArrowBack sx={{fontSize:16}}/><Typography variant="caption">بورس‌نما · اولین گام برای دنبال‌کردن بازارهای جهانی</Typography></Stack>
+  </Container>
+ </Box>;
+}
